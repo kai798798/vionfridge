@@ -1,0 +1,11 @@
+torch
+torchvision
+transformers
+pillow
+pytest
+black
+ruff
+scipy
+# ultralytics
+# opencv-python
+# supervision

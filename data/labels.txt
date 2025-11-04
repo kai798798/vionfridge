@@ -1,0 +1,102 @@
+apple
+banana
+orange
+grape
+strawberry
+blueberry
+raspberry
+blackberry
+cherry
+watermelon
+cantaloupe
+honeydew
+kiwi
+pineapple
+mango
+papaya
+pear
+peach
+plum
+apricot
+lemon
+lime
+grapefruit
+avocado
+tomato
+cucumber
+carrot
+celery
+lettuce
+spinach
+kale
+broccoli
+cauliflower
+cabbage
+bok choy
+zucchini
+eggplant
+bell pepper
+jalapeno
+onion
+garlic
+green onion
+ginger
+potato
+sweet potato
+corn
+peas
+green bean
+asparagus
+mushroom
+radish
+beet
+pumpkin
+squash
+okra
+brussels sprout
+turnip
+apple juice
+orange juice
+milk
+yogurt
+cheese
+butter
+egg
+tofu
+chicken breast
+pork chop
+beef steak
+fish fillet
+shrimp
+salmon
+crab
+ham
+bacon
+sausage
+turkey
+duck
+ground beef
+hot dog
+bread
+bagel
+tortilla
+rice
+noodle
+pasta
+soup
+sauce
+mayonnaise
+ketchup
+mustard
+salad
+coleslaw
+pickle
+kimchi
+jam
+hummus
+buttermilk
+cream cheese
+sour cream
+ice cream
+frozen vegetable
+frozen fruit
