@@ -6,6 +6,7 @@ pytest
 black
 ruff
 scipy
-# ultralytics
-# opencv-python
-# supervision
+ultralytics
+opencv-python
+supervision==0.18.0
+numpy
