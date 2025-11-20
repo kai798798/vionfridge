@@ -26,10 +26,10 @@ def parse_args():
     args = p.parse_args()
 
     args.labels = "data/labels.txt"
-    args.model = "yolov8n.pt"
-    args.conf = 0.35
-    args.imgsz = 640 # image size
-    args.stride = 3
+    args.model = "yolov8s.pt"
+    args.conf = 0.25 # confidence threshold
+    args.imgsz = 960 # image size
+    args.stride = 1
     args.json = True # JSON output
     args.mode = "in"  # or net
     args.zone = "FULL" # full frame by default
