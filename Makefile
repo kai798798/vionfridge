@@ -1,5 +1,5 @@
 SHELL := /bin/sh
-PY ?= python
+PY ?= python3
 
 .PHONY: install classify_pic count_pic count_vid clean
 

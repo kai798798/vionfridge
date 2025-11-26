@@ -3,6 +3,7 @@ import supervision as sv
 import numpy as np
 import cv2
 from pathlib import Path
+import mediapipe as mp
 
 
 def load_focus_labels(path: str):
@@ -22,15 +23,13 @@ def parse_zone(zone_str: str):
 
 
 def build_zone_and_annotator(H, W, zone_arg):
-    # polygon
     if zone_arg:
         poly_np = np.array(parse_zone(zone_arg), dtype=int)
     else:
-        # default: FULL FRAME
+        # default: full frame
         poly_np = np.array([[0, 0], [W, 0], [W, H], [0, H]], dtype=int)
 
-    # PolygonZone (handle versions)
-    try:
+    try: # versions
         zone = sv.PolygonZone(polygon=poly_np, frame_resolution_wh=(W, H))
     except TypeError:
         zone = sv.PolygonZone(polygon=poly_np)
@@ -72,6 +71,7 @@ def build_zone_and_annotator(H, W, zone_arg):
 
 class Perception:
     def __init__(self, model_path, labels_path, conf, imgsz, stride, H, W, zone_arg):
+        # yolo tracking
         self.model = YOLO(model_path)
         self.tracker = sv.ByteTrack()
         self.focus = load_focus_labels(labels_path)
@@ -87,17 +87,19 @@ class Perception:
             zone_arg = f"0,0;{W},0;{W},{H};0,{H}"
         self.ZONE, self.annotate_zone = build_zone_and_annotator(H, W, zone_arg)
 
-    def process_frame(self, frame):
+        # mediapipe hand
+        self.mp_hands = mp.solutions.hands
+        self.mp_draw = mp.solutions.drawing_utils
+        self.hands = self.mp_hands.Hands(
+            static_image_mode=False,
+            max_num_hands=2,
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5,
+        )
+
+    def _detect_foods(self, frame):
         """
-        Returns:
-            foods: list of dicts:
-              {
-                "id": tid,
-                "name": "banana",
-                "bbox": (x1, y1, x2, y2),
-                "center": (cx, cy),
-                "inside": bool
-              }
+        YOLO + ByteTrack + zone -> list of food dicts.
         """
         do_det = (self.frame_idx % self.stride == 0) or (self.prev_det is None)
 
@@ -160,5 +162,57 @@ class Perception:
                 }
             )
 
-        self.frame_idx += 1
         return foods
+
+    def _detect_hands(self, frame):
+        """
+        MediaPipe Hands -> list of hand dicts:
+          { "bbox": (x1,y1,x2,y2), "center": (cx,cy) }
+        """
+        H, W = frame.shape[:2]
+        img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = self.hands.process(img_rgb)
+
+        hands = []
+        if not results.multi_hand_landmarks:
+            return hands
+
+        for handLms in results.multi_hand_landmarks:
+            xs = [lm.x * W for lm in handLms.landmark]
+            ys = [lm.y * H for lm in handLms.landmark]
+            x1, x2 = min(xs), max(xs)
+            y1, y2 = min(ys), max(ys)
+            cx = (x1 + x2) / 2.0
+            cy = (y1 + y2) / 2.0
+
+            hands.append(
+                {
+                    "bbox": (float(x1), float(y1), float(x2), float(y2)),
+                    "center": (float(cx), float(cy)),
+                }
+            )
+
+        return hands
+
+    def process_frame(self, frame):
+        """
+        Returns:
+            foods: list of dicts:
+              {
+                "id": tid,
+                "name": "banana",
+                "bbox": (x1, y1, x2, y2),
+                "center": (cx, cy),
+                "inside": bool
+              }
+            hands: list of dicts:
+              {
+                "bbox": (hx1, hy1, hx2, hy2),
+                "center": (hx, hy)
+              }
+        """
+        foods = self._detect_foods(frame)
+        hands = self._detect_hands(frame)
+
+        self.frame_idx += 1
+        return foods, hands

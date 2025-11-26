@@ -2,10 +2,9 @@ import argparse, json
 import cv2
 from ultralytics import YOLO
 import supervision as sv
-
 from perception import load_focus_labels, build_zone_and_annotator
 from interaction import InteractionLogic
-
+import mediapipe as mp
 
 def _print_final(counts, as_json=False):
     if as_json:
@@ -52,13 +51,16 @@ def main():
     ok, frame0 = cap.read()
     if not ok:
         raise SystemExit("Empty video")
+    frame0 = cv2.rotate(frame0, cv2.ROTATE_90_CLOCKWISE)
     H, W = frame0.shape[:2]
+    cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # rewind
 
     if args.zone and args.zone.strip().upper() == "FULL":
         args.zone = f"0,0;{W},0;{W},{H};0,{H}"
 
     ZONE, annotate_zone = build_zone_and_annotator(H, W, args.zone)
 
+    # YOLO
     model = YOLO(args.model)
     tracker = sv.ByteTrack()
 
@@ -68,6 +70,18 @@ def main():
     box_annot = sv.BoxAnnotator()
     label_annot = sv.LabelAnnotator()
 
+    # mediapipe
+    mp_hands = mp.solutions.hands
+    mp_draw = mp.solutions.drawing_utils
+    hands_detector = mp_hands.Hands(
+        static_image_mode=False,
+        max_num_hands=2,
+        min_detection_confidence=0.5,
+        min_tracking_confidence=0.5,
+    )
+
+
+
     frame_idx = 0
     prev_det = None
     class_names = None
@@ -76,6 +90,8 @@ def main():
         ok, frame = cap.read()
         if not ok:
             break
+        
+        frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
 
         do_det = (frame_idx % args.stride == 0) or (prev_det is None)
 
@@ -134,6 +150,17 @@ def main():
             logic.update(name, tid, now_in)
 
         if args.show:
+            # show hands skeleton
+            img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            results = hands_detector.process(img_rgb)
+            if results.multi_hand_landmarks:
+                for handLms in results.multi_hand_landmarks:
+                    mp_draw.draw_landmarks(
+                        frame,
+                        handLms,
+                        mp_hands.HAND_CONNECTIONS,
+                    )
+
             labels = []
             for i in range(len(dets)):
                 conf = (
@@ -166,6 +193,7 @@ def main():
                 2,
             )
             cv2.imshow("Video Count (no-hands)", frame_)
+            cv2.moveWindow("Video Count (no-hands)", 800, 50)
             if cv2.waitKey(1) & 0xFF == 27:
                 break
 
