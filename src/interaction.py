@@ -1,35 +1,86 @@
 import collections
+from typing import List, Dict, Tuple, Any
 
 class InteractionLogic:
-    def __init__(self, mode="in"):
-        self.mode = mode  # "in", "net", "cross"
-        self.last_inside = {}  # tracker_id -> bool
-        self.counts = collections.Counter()
-
-    def update(self, name, tracker_id, now_in):
+    def __init__(self, max_missing_frames=30):
         """
-        Call this once per detection per frame.
-
-        name: class name, e.g. "banana"
-        tracker_id: stable ID from ByteTrack
-        now_in: bool, whether it's inside the zone this frame
+        max_missing_frames: How many frames an ID can be missing before we delete it 
+                            from memory (to save RAM).
         """
-        was_in = self.last_inside.get(tracker_id, False)
+        self.item_states: Dict[int, Dict[str, Any]] = {}
+        self.final_counts: Dict[str, Dict[str, int]] = collections.defaultdict(lambda: {"in": 0, "out": 0})
+        
+        # Cleanup settings
+        self.max_missing_frames = max_missing_frames
+        self.frame_count = 0 
 
-        if now_in != was_in:
-            if self.mode == "in":
-                if not was_in and now_in:  # outside -> inside
-                    self.counts[name] += 1
-            elif self.mode == "net":
-                if not was_in and now_in:
-                    self.counts[name] += 1
-                else:
-                    self.counts[name] -= 1
-            elif self.mode == "cross":
-                # every boundary crossing
-                self.counts[name] += 1
+    def _is_overlapping(self, bbox_a, bbox_b):
+        x1_a, y1_a, x2_a, y2_a = bbox_a
+        x1_b, y1_b, x2_b, y2_b = bbox_b
+        if x1_a > x2_b or x2_a < x1_b or y1_a > y2_b or y2_a < y1_b:
+            return False
+        return True
 
-        self.last_inside[tracker_id] = now_in
+    def _is_being_handled(self, food_bbox, hands):
+        for hand in hands:
+            if self._is_overlapping(food_bbox, hand["bbox"]):
+                return True
+        return False
 
-    def get_counts(self):
-        return dict(self.counts)
+    def process_frame(self, foods: List[Dict[str, Any]], hands: List[Dict[str, Any]]):
+        self.frame_count += 1
+        
+        # 1. Update states and check for counting
+        for food in foods:
+            tracker_id = food["id"]
+            name = food["name"]
+            now_in = food["inside"]
+            
+            state = self.item_states.get(tracker_id)
+            if state is None:
+                self.item_states[tracker_id] = {
+                    "name": name,
+                    "was_in": now_in,
+                    "last_center": food["center"],
+                    "last_seen": self.frame_count  # NEW: Track when we last saw it
+                }
+                if name not in self.final_counts:
+                    self.final_counts[name] = {"in": 0, "out": 0}
+                continue
+
+            # Update last seen time
+            state["last_seen"] = self.frame_count # NEW
+
+            was_in = state["was_in"]
+            is_handled = self._is_being_handled(food["bbox"], hands)
+
+            if now_in != was_in:
+                if is_handled:
+                    if not was_in and now_in:
+                        self.final_counts[name]["in"] += 1
+                        print(f"[{tracker_id} / {name}] COUNTED: IN (Handled)")
+                    elif was_in and not now_in:
+                        self.final_counts[name]["out"] += 1
+                        print(f"[{tracker_id} / {name}] COUNTED: OUT (Handled)")
+                
+                state["was_in"] = now_in
+            
+            state["last_center"] = food["center"]
+
+        # 2. CLEANUP LOGIC (Garbage Collection)
+        ids_to_remove = []
+        
+        for tid, state in self.item_states.items():
+            # Calculate how long it has been gone
+            frames_since_seen = self.frame_count - state["last_seen"]
+            
+            if frames_since_seen > self.max_missing_frames:
+                ids_to_remove.append(tid)
+
+        for tid in ids_to_remove:
+            # Optional: Print when deleting so you know it happened
+            # print(f"Removing ID {tid} (inactive for {self.max_missing_frames} frames)")
+            del self.item_states[tid]
+            
+    def get_final_counts(self):
+        return dict(self.final_counts)
