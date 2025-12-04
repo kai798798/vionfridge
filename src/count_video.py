@@ -23,7 +23,6 @@ def parse_args():
     p.add_argument("video", help="Path to video file")
     p.add_argument("--show", action="store_true", help="Show live window with overlays")
 
-    # keep these so Makefile flags don't break; defaults match your current setup
     p.add_argument("--labels", default="data/labels.txt")
     p.add_argument("--model", default="yolov8s.pt")
     p.add_argument("--conf", type=float, default=0.25)
@@ -35,7 +34,6 @@ def parse_args():
 
     args = p.parse_args()
 
-    # force JSON output always
     if not args.json:
         args.json = True
 

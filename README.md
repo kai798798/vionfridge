@@ -10,4 +10,3 @@ make install
 make count_vid <filename without .filetype> SHOW=1 (for live window)
 make percep <filename without .filetype> SHOW=1 (for testing)
 
-
